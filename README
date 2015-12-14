@@ -1,0 +1,10 @@
+# pyicabmodules
+
+Python script to unpack, build, then inject **.icabmodule** files.
+
+
+> **This project is not affiliated with or endorsed by Alexander Clauss.**
+
+> The calculator module is a stock module created by Alexander Clauss and **all credit and rights of it belong to him**.
+
+> The calculator module is included **solely for demonstration and testing this python module's functionality**.

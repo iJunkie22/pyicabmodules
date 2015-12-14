@@ -9,7 +9,9 @@ class ModuleConfig(object):
         self.icon1x = io.BytesIO()
         self.icon2x = io.BytesIO()
         self.module_dict = {'title': {}, 'description': {}}
-        self.vars_array = []
+        self.prefs_array = []
+        self.id = None
+        self.code = None
 
     def add_description(self, conf_str):
         attr_name = conf_str.partition('=')[0]
@@ -35,6 +37,9 @@ class ModuleConfig(object):
         else:
             self.icon1x.write(base64.b64decode(conf_str.partition('=')[2]))
 
+    def add_id(self, conf_str):
+        self.id = conf_str.partition('=')[2]
+
     def add_var(self, conf_str):
         v_parts = conf_str.rstrip(';').split(';')
         v_dict = {}
@@ -53,10 +58,9 @@ class ModuleConfig(object):
             v_dict['default'] = (v_dict['default'] == 'true')  # convert JS bool string to pyBool
 
         assert v_dict['type'] not in (0, 1, 2, 3, 7), 'These are not implemented yet!!'
-        print "-->var", v_dict
+        self.prefs_array.append(v_dict)
 
         # TODO: Add support for bool, int, string, pass, and select
-
 
     @classmethod
     def from_string(cls, s2):
@@ -70,23 +74,54 @@ class ModuleConfig(object):
                 new_module.add_icon(line)
             elif line.startswith('var'):
                 new_module.add_var(line)
+            elif line.startswith('id'):
+                new_module.add_id(line)
+
         return new_module
 
     def __del__(self):
         self.icon1x.close()
         self.icon2x.close()
 
+    def check_id(self):
+        assert self.id and self.id != ''
+
     def write_icons(self):
-        i1 = open('icon1.png', 'wb')
-        i2 = open('icon2.png', 'wb')
+        self.check_id()
+        i1 = open(self.id + '.icon.png', 'wb')
+        i2 = open(self.id + '@2x.icon.png', 'wb')
         i1.write(self.icon1x.getvalue())
         i2.write(self.icon2x.getvalue())
         i1.close()
         i2.close()
 
+    def write_prefs(self):
+        self.check_id()
+        plistlib.writePlist(self.prefs_array, self.id + '.prefs.plist')
+
+    def write_code(self):
+        self.check_id()
+        c_fd = open(self.id + '.code.js', 'w')
+        try:
+            c_fd.write(self.code)
+
+        finally:
+            c_fd.close()
+
 
 class Module(object):
-    def __init__(self, header, contents):
+    def __init__(self, module_conf_obj):
+        self.conf_obj = module_conf_obj
+        assert isinstance(self.conf_obj, ModuleConfig)
+
+    def build_files(self):
+        self.conf_obj.write_icons()
+        self.conf_obj.write_prefs()
+        self.conf_obj.write_code()
+
+    def inject_module(self):
+        # TODO: Write injector that injects built files into Modules directory
+        # TODO: Write injector that injects self.conf_obj.module_dict into modules.plist
         pass
 
     @classmethod
@@ -112,16 +147,17 @@ class Module(object):
         print m_header.getvalue()
         mc1 = ModuleConfig.from_string(m_header.getvalue())
         m_header.close()
-        print m_contents.getvalue()
+        mc1.code = m_contents.getvalue()
         m_contents.close()
-        mc1.write_icons()
-        print mc1.module_dict
+        new_icab_module = cls(mc1)
+
+        return new_icab_module
+
 
 
 fd1 = open("690_Calculator-1.icabmodule", 'r')
 flines = fd1.read()
 fd1.close()
 
-Module.from_string(flines)
-
-
+module1 = Module.from_string(flines)
+module1.build_files()
